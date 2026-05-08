@@ -33,53 +33,68 @@
       <main class="workspace">
         <header class="topbar">
           <button id="toggleLeftPane" class="pane-toggle" title="收起/展开目录" aria-label="Toggle directory pane">☰</button>
-          <nav class="mode-tabs" aria-label="Modes">
-            <button class="mode active" data-mode="chat">主编</button>
-            <button class="mode" data-mode="research">调研</button>
-            <button class="mode" data-mode="write">写作</button>
-            <button class="mode" data-mode="edit">编辑</button>
-            <button class="mode" data-mode="fact-check">核查</button>
-            <button class="mode" data-mode="analyze">分析</button>
-            <button class="mode" data-mode="extract">提取</button>
-            <button class="mode" data-mode="archive">归档</button>
-            <button class="mode" data-mode="pipeline">全流程</button>
+          <nav id="processSteps" class="process-steps" aria-label="Writing process">
+            <button class="process-step active" data-step="topic">选题交互</button>
+            <button class="process-step" data-step="outline">大纲框架</button>
+            <button class="process-step" data-step="draft">初稿敲定</button>
+            <button class="process-step" data-step="refine">内容精修</button>
+            <button class="process-step" data-step="fact">事实核查</button>
+            <button class="process-step" data-step="score">质量评分</button>
+            <button class="process-step" data-step="final">终稿敲定</button>
           </nav>
-          <div id="agentActivity" class="agent-activity idle">
-            <span class="activity-label">待命</span>
-            <span class="activity-agents"></span>
-            <span class="activity-dots"><i></i><i></i><i></i></span>
-          </div>
           <button id="toggleRightPane" class="pane-toggle" title="收起/展开预览" aria-label="Toggle preview pane">◫</button>
-          <div class="task-status" id="taskStatus">Idle</div>
         </header>
-        <div id="modeHint" class="mode-hint">自由对话，Chief 会判断该调用哪种创作能力。</div>
+        <div id="modeHint" class="mode-hint">从右侧开始对话，editAI 会按流程调度合适的专家能力。</div>
 
-        <section class="conversation" id="conversation">
-          <article class="message assistant">
-            <div class="message-meta">Chief</div>
-            <div class="message-body">选择一个模式，或直接描述你要完成的内容任务。可以拖入 Markdown 文件作为上下文。</div>
-          </article>
+        <section id="projectGate" class="project-gate">
+          <div class="project-card">
+            <p class="eyebrow">New Project</p>
+            <h2>创建一个文章项目</h2>
+            <p>editAI 会在当前工作目录的 <code>editai_note</code> 文件夹下创建项目，并默认生成 <code>draft.md</code>。</p>
+            <div class="project-create-row">
+              <input id="projectNameInput" type="text" placeholder="输入项目名，不要包含 / : \\ 等非法字符" />
+              <button id="createProjectButton" class="send-button">创建</button>
+            </div>
+            <div id="projectError" class="project-error"></div>
+            <div id="projectList" class="project-list"></div>
+          </div>
         </section>
 
-        <section class="composer" id="composerDropzone">
-          <div id="attachmentTray" class="attachment-tray"></div>
-          <div id="mentionMenu" class="mention-menu" hidden></div>
-          <div class="prompt-row">
-            <textarea id="promptInput" placeholder="Message editAI，输入 @ 引用文件或目录"></textarea>
-            <button id="sendButton" class="send-button">发送</button>
+        <section id="writingStage" class="writing-stage" hidden>
+          <div class="draft-header">
+            <div>
+              <p class="eyebrow">Draft</p>
+              <h2 id="activeProjectName">工作稿</h2>
+            </div>
+            <div class="draft-actions">
+              <button id="saveDraftButton" class="secondary-button">保存工作稿</button>
+              <button id="stageActionButton" class="send-button">下一步</button>
+              <button id="saveFinalButton" class="secondary-button" hidden>保存终稿</button>
+            </div>
           </div>
+          <div id="writingPhaseNotice" class="phase-notice"></div>
+          <article id="draftEditor" class="draft-editor markdown-render" contenteditable="true" role="textbox" aria-label="编辑文章草稿"></article>
+          <div id="compactLog" class="compact-log"></div>
         </section>
       </main>
 
       <aside class="preview-panel">
         <div class="preview-header">
           <div>
-            <p class="eyebrow">Overview</p>
-            <h2 id="guidanceTitle">参考方向</h2>
+            <p class="eyebrow">Chat</p>
+            <h2 id="guidanceTitle">流程助手</h2>
           </div>
         </div>
-        <div id="guidanceMeta" class="preview-path">Agent 的关键判断会在这里汇总。</div>
-        <article id="guidancePanel" class="markdown-preview empty">开始一个创作任务后，这里会沉淀每一步 agent 给出的方向、风险和下一步建议。</article>
+        <div id="guidanceMeta" class="preview-path">右侧对话会结合当前流程、上下文和中间文章。</div>
+        <div id="historyPanel" class="history-panel chat-history"></div>
+        <section class="composer side-composer" id="composerDropzone">
+          <div id="attachmentTray" class="attachment-tray"></div>
+          <div id="mentionMenu" class="mention-menu" hidden></div>
+          <div class="prompt-row">
+            <textarea id="promptInput" placeholder="输入反馈，或用 @ 引用文件/目录"></textarea>
+            <button id="sendButton" class="send-button">发送</button>
+          </div>
+        </section>
       </aside>
     </div>
 
@@ -126,6 +141,27 @@
         </div>
         <div id="directoryCurrent" class="directory-current"></div>
         <div id="directoryList" class="directory-list"></div>
+      </form>
+    </dialog>
+
+    <dialog id="styleDialog" class="settings-dialog">
+      <form method="dialog" class="settings-content">
+        <div class="settings-header">
+          <div>
+            <p class="eyebrow">Style</p>
+            <h2>导入历史文章</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close style setup">×</button>
+        </div>
+        <p class="settings-note">导入一次后，editAI 会长期使用你的风格指纹。你可以粘贴历史文章，或先跳过。</p>
+        <textarea id="styleSourceInput" class="style-source" placeholder="粘贴 1-5 篇历史文章，或粘贴你最有代表性的文章内容"></textarea>
+        <div class="settings-actions">
+          <span id="styleState"></span>
+          <div class="settings-button-row">
+            <button id="skipStyleButton" class="secondary-button" value="default">跳过</button>
+            <button id="saveStyleButton" class="send-button" value="default">生成风格指纹</button>
+          </div>
+        </div>
       </form>
     </dialog>
 

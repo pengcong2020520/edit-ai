@@ -8,6 +8,9 @@ export type ContentMode =
   | "extract"
   | "archive"
   | "pipeline"
+  | "super-interviewer"
+  | "super-analyst"
+  | "super-workflow"
 
 export interface BuildPromptInput {
   mode: ContentMode
@@ -33,6 +36,9 @@ const modeLabels: Record<ContentMode, string> = {
   extract: "nt extract",
   archive: "nt archive",
   pipeline: "nt pipeline",
+  "super-interviewer": "/super-interviewer",
+  "super-analyst": "/super-analyst",
+  "super-workflow": "/super-workflow",
 }
 
 function addSharedContext(input: BuildPromptInput): string {
@@ -143,9 +149,70 @@ ${message}${context}`
     case "pipeline":
       return buildPipelineOutlinePrompt(input)
 
+    case "super-interviewer":
+      return `Use the \`super-interviewer\` skill for this writing workspace request.
+
+Call and follow: skill({ name: "super-interviewer" })
+
+Act as an interviewing writing partner. Base every question and suggestion on the current article, project context, and conversation history. Avoid generic questions and do not repeat questions already asked.
+
+The user's current article is the source of truth. If the user gives a revision instruction, revise the article according to that instruction while preserving the user's existing content, structure, facts, and voice unless the instruction explicitly asks to change them. Do not drop paragraphs simply because you are asking interview questions.
+
+Return Markdown with two clearly separated sections:
+
+## 采访启发
+List focused questions, prompts, and thinking directions for the user. This section will be shown in the right sidebar.
+
+## 文章草稿
+Return the complete current article after applying the user's latest instruction. If no revision is needed, return the complete current article unchanged. This section replaces the main editable draft, so it must not omit user-written content.
+
+User request:
+${message}${context}`
+
+    case "super-analyst":
+      return `Use the \`super-analyst\` skill for this writing workspace request.
+
+Call and follow: skill({ name: "super-analyst" })
+
+Analyze the user's article as a writing analyst. Focus on structure, argument, reader value, missing evidence, clarity, and revision opportunities. Ground every point in the current article and project context.
+
+The user's current article is the source of truth. If the user gives a revision instruction, apply it to the article while preserving the user's existing content, structure, facts, and voice unless the instruction explicitly asks to change them.
+
+Return Markdown with two clearly separated sections:
+
+## 分析建议
+List concise, actionable analysis for the right sidebar.
+
+## 文章草稿
+Return the complete current article after applying the user's latest instruction. If no revision is needed, return the complete current article unchanged. This section replaces the main editable draft, so it must not omit user-written content.
+
+User request:
+${message}${context}`
+
+    case "super-workflow":
+      return `Use the \`super-workflow\` skill for this writing workspace request.
+
+Call and follow: skill({ name: "super-workflow" })
+
+Evaluate the full article quality as a writing workflow reviewer. Return Markdown with:
+
+## 质量评分
+Score the article on clarity, structure, originality, evidence, reader value, style consistency, and completion. Include an overall score out of 100 and mark whether it is 合格 or 不合格.
+
+## 修改建议
+List actionable improvements if the score is not sufficient.
+
+## 文章草稿
+Return the complete current article unchanged unless the user explicitly asked for a rewrite.
+
+User request:
+${message}${context}`
+
     case "chat":
     default:
       return `You are Chief in the editAI web writing workspace. Treat this as a conversation with a personal content creation platform user. Select the right editAI mode internally when helpful.
+
+When the user is starting from an empty article, first clarify the writing goal if necessary. If there is enough information, coordinate the appropriate expert agents internally and produce a first Markdown draft. If the prompt asks for an initial draft, return a clear \`## 文章草稿\` section containing the complete editable draft.
 
 User message:
 ${message}${context}`

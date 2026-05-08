@@ -20,18 +20,19 @@ interface DeepSeekResponse {
   error?: {
     message?: string
   }
+  message?: string
 }
 
 function getBaseUrl(): string {
-  return (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "")
+  return (process.env.EDITAI_LLM_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "")
 }
 
 export function hasDeepSeekConfig(): boolean {
-  return Boolean(process.env.DEEPSEEK_API_KEY)
+  return Boolean(process.env.EDITAI_LLM_API_KEY || process.env.DEEPSEEK_API_KEY)
 }
 
 export function getDeepSeekModel(): string {
-  return process.env.DEEPSEEK_MODEL || "deepseek-chat"
+  return process.env.EDITAI_LLM_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat"
 }
 
 export async function runDeepSeekTask(input: BuildPromptInput): Promise<DeepSeekResult> {
@@ -59,36 +60,102 @@ export async function continueDeepSeekPipeline(outline: string): Promise<DeepSee
 }
 
 async function callDeepSeek(messages: DeepSeekMessage[]): Promise<DeepSeekResult> {
-  const apiKey = process.env.DEEPSEEK_API_KEY
+  const apiKey = process.env.EDITAI_LLM_API_KEY || process.env.DEEPSEEK_API_KEY
   if (!apiKey) {
-    throw new Error("DEEPSEEK_API_KEY is not configured")
+    throw new Error("EDITAI_LLM_API_KEY or DEEPSEEK_API_KEY is not configured")
   }
 
   const model = getDeepSeekModel()
-  const response = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.5,
-    }),
+  const maxAttempts = Number(process.env.EDITAI_LLM_MAX_RETRIES || process.env.DEEPSEEK_MAX_RETRIES || 3)
+  const timeoutMs = Number(process.env.EDITAI_LLM_TIMEOUT_MS || process.env.DEEPSEEK_TIMEOUT_MS || 60_000)
+  let lastError = ""
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const abortController = new AbortController()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let response: Response
+    try {
+      const request = fetch(`${getBaseUrl()}/v1/chat/completions`, {
+        method: "POST",
+        signal: abortController.signal,
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.5,
+        }),
+      })
+      response = await withTimeout(request, timeoutMs, () => abortController.abort())
+    } catch (error) {
+      if (timeout) clearTimeout(timeout)
+      lastError = error instanceof Error && error.name === "AbortError"
+        ? `LLM request timed out after ${timeoutMs}ms`
+        : error instanceof Error ? error.message : String(error)
+      if (attempt >= maxAttempts) break
+      await sleep(Math.min(8000, 800 * 2 ** (attempt - 1)))
+      continue
+    } finally {
+      if (timeout) clearTimeout(timeout)
+    }
+
+    const data = await readDeepSeekResponse(response)
+    if (response.ok) {
+      const content = data.choices?.[0]?.message?.content?.trim()
+      if (!content) {
+        throw new Error("LLM returned an empty response")
+      }
+
+      return { content, model }
+    }
+
+    lastError = data.error?.message || data.message || `LLM request failed with HTTP ${response.status}`
+    if (!isRetriableLLMError(response.status, lastError) || attempt >= maxAttempts) break
+    await sleep(Math.min(8000, 800 * 2 ** (attempt - 1)))
+  }
+
+  throw new Error(formatLLMError(lastError))
+}
+
+async function readDeepSeekResponse(response: Response): Promise<DeepSeekResponse> {
+  try {
+    return await response.json() as DeepSeekResponse
+  } catch {
+    return { message: `LLM request failed with HTTP ${response.status}` }
+  }
+}
+
+function isRetriableLLMError(status: number, message: string): boolean {
+  return status === 429 || status >= 500 || /busy|overload|rate limit|temporarily|timeout|繁忙|过载|限流/i.test(message)
+}
+
+function formatLLMError(message: string): string {
+  if (/timed out|timeout|超时/i.test(message)) {
+    return "模型服务请求超时，供应商当前没有及时响应。你可以稍后重试，或在 .env 中临时切换 EDITAI_LLM_BASE_URL / EDITAI_LLM_MODEL / EDITAI_LLM_API_KEY 到其他 OpenAI-compatible 服务。"
+  }
+  if (/Service is too busy|busy|overload|temporarily|繁忙|过载/i.test(message)) {
+    return "模型服务当前繁忙，已自动重试但仍未成功。你可以稍后重试，或在 .env 中临时切换 EDITAI_LLM_BASE_URL / EDITAI_LLM_MODEL / EDITAI_LLM_API_KEY 到其他 OpenAI-compatible 服务。"
+  }
+  return message
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, onTimeout: () => void): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeout = setTimeout(() => {
+      onTimeout()
+      const error = new Error(`LLM request timed out after ${timeoutMs}ms`)
+      error.name = "AbortError"
+      reject(error)
+    }, timeoutMs)
   })
-
-  const data = await response.json() as DeepSeekResponse
-  if (!response.ok) {
-    throw new Error(data.error?.message || `DeepSeek request failed with HTTP ${response.status}`)
-  }
-
-  const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) {
-    throw new Error("DeepSeek returned an empty response")
-  }
-
-  return { content, model }
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeout))
 }
 
 function toDeepSeekHistory(conversation: ConversationTurn[] = []): DeepSeekMessage[] {

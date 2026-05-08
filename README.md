@@ -49,12 +49,21 @@ PORT=3900 bun run web
 For local use, configure model access in `.env`:
 
 ```bash
+EDITAI_LLM_API_KEY=
+EDITAI_LLM_BASE_URL=https://api.deepseek.com
+EDITAI_LLM_MODEL=deepseek-chat
+EDITAI_LLM_MAX_RETRIES=3
+EDITAI_LLM_TIMEOUT_MS=60000
+
 DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_TIMEOUT_MS=60000
 ```
 
 Do not commit real API keys. `.env` is ignored by Git.
+
+`DEEPSEEK_*` remains supported. `EDITAI_LLM_*` is preferred for temporary switching to another OpenAI-compatible provider when a model service is busy.
 
 ## Web Workspace
 

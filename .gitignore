@@ -29,6 +29,9 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
+editai_note/
+.editai/
+test-results/
 
 # Project-level agent instructions (contains internal info, not for public repo)
 AGENTS.md
