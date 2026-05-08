@@ -32,6 +32,7 @@ oauth-success.html
 editai_note/
 .editai/
 test-results/
+output/
 
 # Project-level agent instructions (contains internal info, not for public repo)
 AGENTS.md
