@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>editAI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div>
+            <p class="eyebrow">editAI</p>
+            <h1>Writing Studio</h1>
+          </div>
+          <button id="settingsButton" class="icon-button" title="Settings" aria-label="Settings">⚙</button>
+        </div>
+
+        <section class="directory-panel">
+          <div class="panel-title">
+            <span>目录</span>
+            <button id="refreshFiles" class="icon-button" title="Refresh files" aria-label="Refresh files">↻</button>
+          </div>
+          <div class="workspace-switcher">
+            <button id="chooseWorkspace" class="secondary-button">选择工作目录</button>
+          </div>
+          <div id="currentPath" class="current-path"></div>
+          <div id="fileTree" class="file-tree"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <button id="toggleLeftPane" class="pane-toggle" title="收起/展开目录" aria-label="Toggle directory pane">☰</button>
+          <nav class="mode-tabs" aria-label="Modes">
+            <button class="mode active" data-mode="chat">主编</button>
+            <button class="mode" data-mode="research">调研</button>
+            <button class="mode" data-mode="write">写作</button>
+            <button class="mode" data-mode="edit">编辑</button>
+            <button class="mode" data-mode="fact-check">核查</button>
+            <button class="mode" data-mode="analyze">分析</button>
+            <button class="mode" data-mode="extract">提取</button>
+            <button class="mode" data-mode="archive">归档</button>
+            <button class="mode" data-mode="pipeline">全流程</button>
+          </nav>
+          <div id="agentActivity" class="agent-activity idle">
+            <span class="activity-label">待命</span>
+            <span class="activity-agents"></span>
+            <span class="activity-dots"><i></i><i></i><i></i></span>
+          </div>
+          <button id="toggleRightPane" class="pane-toggle" title="收起/展开预览" aria-label="Toggle preview pane">◫</button>
+          <div class="task-status" id="taskStatus">Idle</div>
+        </header>
+        <div id="modeHint" class="mode-hint">自由对话，Chief 会判断该调用哪种创作能力。</div>
+
+        <section class="conversation" id="conversation">
+          <article class="message assistant">
+            <div class="message-meta">Chief</div>
+            <div class="message-body">选择一个模式，或直接描述你要完成的内容任务。可以拖入 Markdown 文件作为上下文。</div>
+          </article>
+        </section>
+
+        <section class="composer" id="composerDropzone">
+          <div id="attachmentTray" class="attachment-tray"></div>
+          <div id="mentionMenu" class="mention-menu" hidden></div>
+          <div class="prompt-row">
+            <textarea id="promptInput" placeholder="Message editAI，输入 @ 引用文件或目录"></textarea>
+            <button id="sendButton" class="send-button">发送</button>
+          </div>
+        </section>
+      </main>
+
+      <aside class="preview-panel">
+        <div class="preview-header">
+          <div>
+            <p class="eyebrow">Overview</p>
+            <h2 id="guidanceTitle">参考方向</h2>
+          </div>
+        </div>
+        <div id="guidanceMeta" class="preview-path">Agent 的关键判断会在这里汇总。</div>
+        <article id="guidancePanel" class="markdown-preview empty">开始一个创作任务后，这里会沉淀每一步 agent 给出的方向、风险和下一步建议。</article>
+      </aside>
+    </div>
+
+    <dialog id="settingsDialog" class="settings-dialog">
+      <form method="dialog" class="settings-content">
+        <div class="settings-header">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h2>API Keys</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close">×</button>
+        </div>
+
+        <div class="settings-grid">
+          <label>DeepSeek<input id="deepseekKey" type="password" placeholder="Use .env for local keys" /></label>
+          <label>OpenAI<input id="openaiKey" type="password" placeholder="sk-..." /></label>
+          <label>Anthropic<input id="anthropicKey" type="password" placeholder="sk-ant-..." /></label>
+          <label>Google<input id="googleKey" type="password" placeholder="AIza..." /></label>
+          <label>Tavily<input id="tavilyKey" type="password" placeholder="tvly-..." /></label>
+          <label>Firecrawl<input id="firecrawlKey" type="password" placeholder="fc-..." /></label>
+          <label>Default model<input id="defaultModel" type="text" placeholder="deepseek-chat" /></label>
+        </div>
+
+        <div class="settings-actions">
+          <span id="settingsState"></span>
+          <button id="saveSettings" class="send-button" value="default">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="directoryDialog" class="directory-dialog">
+      <form method="dialog" class="directory-content">
+        <div class="settings-header">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h2>选择工作目录</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close directory chooser">×</button>
+        </div>
+        <div class="directory-actions">
+          <button id="directoryHome" class="secondary-button" value="default">Home</button>
+          <button id="directoryUp" class="secondary-button" value="default">上一级</button>
+          <button id="useDirectory" class="send-button" value="default">使用此目录</button>
+        </div>
+        <div id="directoryCurrent" class="directory-current"></div>
+        <div id="directoryList" class="directory-list"></div>
+      </form>
+    </dialog>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
